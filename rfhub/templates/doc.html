@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Documentation</title>
+</head>
+<body>
+    {{ doc|safe }}
+
+    {% if keyword %}
+    <script>
+        // When the page is fully loaded, scroll to the keyword's anchor.
+        window.onload = function() {
+            // The 'tojson' filter ensures the keyword name is safely
+            // escaped for use in JavaScript.
+            window.location.hash = {{ keyword|tojson|safe }};
+        };
+    </script>
+    {% endif %}
+</body>
+</html>

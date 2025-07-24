@@ -1,0 +1,20 @@
+<!-- rfhub/templates/index.html -->
+<style>
+    body { font-family: sans-serif; }
+    h1 { font-size: 1.5em; }
+    ul { list-style-type: none; padding-left: 0; }
+    li { margin: 8px 0; }
+    a { text-decoration: none; color: #005ea5; font-size: 1.1em; }
+    a:hover { text-decoration: underline; }
+</style>
+
+<h1>Keyword Collections</h1>
+<ul>
+    {% for collection in collections %}
+    <li>
+        <a href="{{ url_for('doc.doc_for_library', collection_id=collection.collection_id) }}" target="content_frame">
+            {{ collection.name }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
