@@ -211,7 +211,7 @@ class KeywordTable(object):
                             self.add(path)
             except Exception as e:
                 # I really need to get the logging situation figured out.
-                print("bummer:", str(e))
+                print(f"bummer: {e}")
 
         # FIXME:
         # instead of passing a flag around, I should just keep track
@@ -285,7 +285,7 @@ class KeywordTable(object):
                         loaded.append(libname.lower())
                     except Exception as e:
                         # need a better way to log this...
-                        self.log.debug("unable to add library: " + str(e))
+                        self.log.debug(f"unable to add library: {e}")
 
         # I hate how I implemented this, but I don't think there's
         # any way to find out which installed python packages are
@@ -297,7 +297,7 @@ class KeywordTable(object):
                     loaded.append(library.lower())
                 except Exception as e:
                     self.log.debug(
-                        "unable to add external library %s: %s" % (library, str(e))
+                        f"unable to add external library {library}: {str(e)}"
                     )
 
     def get_collection(self, collection_id):
@@ -451,14 +451,13 @@ class KeywordTable(object):
             ]
 
         sql = (
-            """SELECT collection.collection_id, collection.name, keyword.name, keyword.doc
+            f"""SELECT collection.collection_id, collection.name, keyword.name, keyword.doc
                 FROM collection_table as collection
                 JOIN keyword_table as keyword
                 WHERE collection.collection_id == keyword.collection_id
-                AND %s
+                AND {COND}
                 ORDER by collection.collection_id, collection.name, keyword.name
             """
-            % COND
         )
 
         cursor = self._execute(sql, args)
@@ -683,11 +682,10 @@ class KeywordTable(object):
 
     def _table_exists(self, name):
         cursor = self.db.execute(
-            """
+            f"""
             SELECT name FROM sqlite_master
-            WHERE type='table' AND name='%s'
+            WHERE type='table' AND name='{name}'
         """
-            % name
         )
         return len(cursor.fetchall()) > 0
 

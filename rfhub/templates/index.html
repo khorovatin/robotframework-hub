@@ -1,20 +1,93 @@
 <!-- rfhub/templates/index.html -->
 <style>
-    body { font-family: sans-serif; }
-    h1 { font-size: 1.5em; }
-    ul { list-style-type: none; padding-left: 0; }
-    li { margin: 8px 0; }
-    a { text-decoration: none; color: #005ea5; font-size: 1.1em; }
-    a:hover { text-decoration: underline; }
+    /* Styles for the tree view */
+    .tree ul { list-style-type: none; padding-left: 20px; margin: 0; }
+    .tree li { margin: 4px 0; }
+    .tree .folder > span, .tree .file > span, .tree .library > span {
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .tree .folder::before { content: '📂 '; }
+    .tree .file::before { content: '📄 '; }
+    .tree .library::before { content: '📚 '; }
+    .tree .collapsed > ul { display: none; }
+    .tree .folder:not(.collapsed)::before { content: '📁 '; }
+    .tree .keyword {
+        list-style-type: '› ';
+        padding-left: 5px;
+        font-weight: normal;
+    }
+    .tree a { text-decoration: none; color: #005ea5; }
+    .tree a:hover { text-decoration: underline; }
+    .tree .keyword a { font-weight: normal; }
 </style>
 
 <h1>Keyword Collections</h1>
-<ul>
-    {% for collection in collections %}
-    <li>
-        <a href="{{ url_for('doc.doc_for_library', collection_id=collection.collection_id) }}" target="content_frame">
-            {{ collection.name }}
-        </a>
-    </li>
-    {% endfor %}
-</ul>
+<div class="tree">
+    {% macro render_tree(node) %}
+        <ul>
+        {% for item in node.children|sort(attribute='name')|sort(attribute='type') %}
+            {% if item.type == 'folder' %}
+                <li class="folder collapsed">
+                    <span onclick="toggleFolder(event, this)">{{ item.name }}</span>
+                    {{ render_tree(item) }}
+                </li>
+            {% else %}
+                <li class="{{ item.type }} collapsed" data-collection-id="{{ item.collection_id }}">
+                    <span onclick="toggleKeywords(event, this)">{{ item.name }}</span>
+                    <!-- Keyword list will be inserted here by JavaScript -->
+                </li>
+            {% endif %}
+        {% endfor %}
+        </ul>
+    {% endmacro %}
+    {{ render_tree(collections_tree) }}
+</div>
+
+<script>
+    function toggleFolder(event, element) {
+        event.stopPropagation();
+        element.parentElement.classList.toggle('collapsed');
+    }
+
+    async function toggleKeywords(event, element) {
+        event.stopPropagation();
+        const listItem = element.parentElement;
+        listItem.classList.toggle('collapsed');
+
+        // Only fetch keywords if the list doesn't already exist
+        if (listItem.querySelector('ul')) {
+            return;
+        }
+
+        const collectionId = listItem.dataset.collectionId;
+        if (!collectionId) return;
+
+        try {
+            const response = await fetch(`/api/collections/${collectionId}/keywords`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const keywords = await response.json();
+
+            if (keywords.length > 0) {
+                const ul = document.createElement('ul');
+                keywords.forEach(kw => {
+                    const li = document.createElement('li');
+                    li.className = 'keyword';
+                    
+                    const a = document.createElement('a');
+                    a.textContent = kw.name;
+                    // This creates the link that loads the doc and jumps to the keyword
+                    a.href = `/doc/keywords/${collectionId}/${encodeURIComponent(kw.name)}`;
+                    a.target = 'content_frame';
+                    
+                    li.appendChild(a);
+                    ul.appendChild(li);
+                });
+                listItem.appendChild(ul);
+            }
+        } catch (error) {
+            console.error('Failed to load keywords:', error);
+        }
+    }
+</script>

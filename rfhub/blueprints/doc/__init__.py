@@ -16,12 +16,11 @@ blueprint = flask.Blueprint(
 
 
 @blueprint.route('/')
-@blueprint.route('/index/')
 def index():
     """Renders the homepage with a tree view of collections."""
     kwdb = current_app.config["kwdb"]
-    collections = kwdb.get_collections()
-    return flask.render_template("home.html", collections=collections)
+    collections_tree = kwdb.get_collections_tree()
+    return flask.render_template("home.html", collections_tree=collections_tree)
 
 @blueprint.route('/doc/')
 def doc():

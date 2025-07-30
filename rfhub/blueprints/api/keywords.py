@@ -21,6 +21,7 @@ class ApiEndpoint:
         blueprint.add_url_rule("/keywords/", view_func=self.get_keywords)
         blueprint.add_url_rule("/keywords/<collection_id>", view_func=self.get_library_keywords)
         blueprint.add_url_rule("/keywords/<collection_id>/<keyword>", view_func=self.get_library_keyword)
+        blueprint.add_url_rule("/collections/<collection_id>/keywords", view_func=self.get_keywords_for_collection)
 
     def get_library_keywords(self, collection_id: str) -> flask.Response:
         """
@@ -64,9 +65,9 @@ class ApiEndpoint:
                     "synopsis": keyword_doc.strip().split("\n")[0],
                     "doc": keyword_doc,
                     "args": keyword_args,
-                    "doc_keyword_url": url_for("doc.doc_for_library", collection_id=keyword_collection_id, keyword=keyword_name),
-                    "api_keyword_url": url_for(".get_library_keyword", collection_id=keyword_collection_id, keyword=keyword_name),
-                    "api_library_url": url_for(".get_library_keywords", collection_id=keyword_collection_id)
+                    "doc_keyword_url": flask.url_for("doc.doc_for_library", collection_id=keyword_collection_id, keyword=keyword_name),
+                    "api_keyword_url": flask.url_for(".get_library_keyword", collection_id=keyword_collection_id, keyword=keyword_name),
+                    "api_library_url": flask.url_for(".get_library_keywords", collection_id=keyword_collection_id)
                 }
 
                 for field in fields_to_include:
@@ -86,7 +87,7 @@ class ApiEndpoint:
 
                 result.append(data)
 
-        return jsonify(keywords=result)
+        return flask.jsonify(keywords=result)
 
     def get_keywords(self) -> flask.Response:
         """
@@ -132,3 +133,15 @@ class ApiEndpoint:
         # Why: If the database returns no data for the keyword, it doesn't exist.
         abort(404, description="Keyword not found.")
 
+    def get_keywords_for_collection(self, collection_id: str) -> flask.Response:
+        """Returns a list of keywords for a specific collection as JSON."""
+        kwdb = current_app.config["kwdb"]
+        # The get_keyword_data method already exists in kwdb.py
+        keywords_data = kwdb.get_keyword_data(collection_id)
+
+        # Convert the list of tuples into a more usable list of dictionaries
+        keywords = [
+            {"name": row[1], "args": row[2], "doc": row[3]}
+            for row in keywords_data
+        ]
+        return flask.jsonify(keywords)
