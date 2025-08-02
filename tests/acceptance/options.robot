@@ -17,7 +17,7 @@ Help for option -l/--library
 
     Start the hub with options    --help
     Output should contain
-    ...    -l LIBRARY, --library LIBRARY
+    ...    -l, --library LIBRARY
     ...    load the given LIBRARY (eg: -l DatabaseLibrary)
 
 Help for option -i/--interface
@@ -26,7 +26,7 @@ Help for option -i/--interface
 
     Start the hub with options    --help
     Output should contain
-    ...    -i INTERFACE, --interface INTERFACE
+    ...    -i, --interface INTERFACE
     ...    use the given network interface
     ...    (default=127.0.0.1)
 
@@ -36,7 +36,7 @@ Help for option -p / --port
 
     Start the hub with options    --help
     Output should contain
-    ...    -p PORT, --port PORT
+    ...    -p, --port PORT
     ...    run on the given PORT
     ...    (default=7070)
 
@@ -55,7 +55,7 @@ Help for option -M/--module
 
     Start the hub with options    --help
     Output should contain
-    ...    -M MODULE, --module MODULE
+    ...    -M, --module MODULE
     ...    give the name of a module that exports one or more
 
 Help for option --poll
