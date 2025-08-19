@@ -106,13 +106,8 @@ def search():
     )
 
 
-# Flask docs imply I can leave the slash off (which I want
-# to do for the .../keyword variant). When I do, a URL like
-# /doc/BuiltIn/Evaluate gets redirected to the one with a
-# trailing slash, which then gives a 404 since the slash
-# is invalid. WTF?
-@blueprint.route("/keywords/<collection_id>/<keyword>")
-@blueprint.route("/keywords/<collection_id>")
+@blueprint.route("/keywords/<collection_id>/<keyword>", strict_slashes=False)
+@blueprint.route("/keywords/<collection_id>", strict_slashes=False)
 # def doc_for_library(collection_id, keyword=""):
 def doc_for_library(collection_id, keyword=None) -> str:
     """Render library documentation"""
@@ -200,3 +195,4 @@ def doc_to_html(doc: str | None, doc_format: str = "ROBOT") -> str:
     # If you want to prevent Jinja from escaping later, return Markup(html).
     # If template uses `|safe`, returning plain str is fine.
     return html
+
