@@ -1,24 +1,26 @@
-from flask import current_app
-from rfhub.kwdb import KeywordTable
-from rfhub.version import __version__
-from robot.utils.argumentparser import ArgFileParser
-from tornado.httpserver import HTTPServer
-from tornado.wsgi import WSGIContainer
-import tornado.ioloop
 import argparse
-from rfhub import blueprints
-import flask
 import importlib
 import inspect
 import os
-import robot.errors
 import signal
 import sys
+
+import flask
+import robot.errors
+import tornado.ioloop
+from flask import current_app
+from robot.utils.argumentparser import ArgFileParser
+from tornado.httpserver import HTTPServer
+from tornado.wsgi import WSGIContainer
+
+from rfhub import blueprints
+from rfhub.kwdb import KeywordTable
+from rfhub.version import __version__
 
 
 class RobotHub(object):
     """Robot hub - website for REST and HTTP access to robot files"""
-    def __init__(self):
+    def __init__(self) -> None:
 
         self.args = self._parse_args()
 
@@ -30,13 +32,13 @@ class RobotHub(object):
         self.app = flask.Flask(__name__)
 
         with self.app.app_context():
-            current_app.kwdb = self.kwdb
+            current_app.config["kwdb"] = self.kwdb
 
         for lib in self.args.library:
             try:
-                self.kwdb.add_library(lib)
+                self.kwdb.add(lib)
             except robot.errors.DataError as e:
-                sys.stderr.write("unable to load library '%s': %s\n" %(lib,e))
+                sys.stderr.write(f"unable to load library '{lib}': {e}\n")
 
         self._load_keyword_data(self.args.path, self.args.no_installed_keywords)
 
@@ -51,8 +53,8 @@ class RobotHub(object):
         if self.args.debug:
             self.app.run(port=self.args.port, debug=self.args.debug, host=self.args.interface)
         else:
-            root = "http://%s:%s" % (self.args.interface, self.args.port)
-            print("tornado web server running on " + root)
+            root = f"http://{self.args.interface}:{self.args.port}"
+            print(f"tornado web server running on {root}")
             self.shutdown_requested = False
             http_server = HTTPServer(WSGIContainer(self.app))
             http_server.listen(port=self.args.port, address=self.args.interface)
@@ -101,8 +103,7 @@ class RobotHub(object):
 
     def _favicon(self):
         static_dir = os.path.join(self.app.root_path, 'static')
-        return flask.send_from_directory(os.path.join(self.app.root_path, 'static'),
-                                         'favicon.ico', mimetype='image/vnd.microsoft.icon')
+        return flask.send_from_directory(static_dir, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
     def _root(self):
         return flask.redirect(self.args.root)
@@ -119,14 +120,16 @@ class RobotHub(object):
             try:
                 self.kwdb.add(path)
             except Exception as e:
-                print("Error adding keywords in %s: %s" % (path, str(e)))
+                print(f"Error adding keywords in {path}: {str(e)}")
 
 class ArgfileAction(argparse.Action):
     '''Called when the argument parser encounters --argumentfile'''
     def __call__ (self, parser, namespace, values, option_string = None):
+        if not isinstance(values, str):
+            raise ValueError(f"Argument file path must be a string, got: {values}")
         path = os.path.abspath(os.path.expanduser(values))
         if not os.path.exists(path):
-            raise Exception("Argument file doesn't exist: %s" % values)
+            raise Exception(f"Argument file doesn't exist: {values}")
 
         ap = ArgFileParser(["--argumentfile","-A"])
         args = ap.process(["-A", values])
@@ -170,10 +173,10 @@ class ModuleAction(argparse.Action):
                     # be inherited (which is important!). See
                     # https://docs.python.org/2/tutorial/classes.html#private-variables-and-class-local-references
 
-                    attr = "_%s__show_in_rfhub" % obj.__name__
+                    attr = f"_{obj.__name__}__show_in_rfhub"
                     if getattr(obj, attr, True):
-                        libname = "%s.%s" % (module.__name__, name)
+                        libname = f"{module.__name__}.{name}"
                         namespace.library.append(libname)
 
         except ImportError as e:
-            print("unable to import '%s' : %s" % (arg,e))
+            print(f"unable to import '{arg}' : {e}")

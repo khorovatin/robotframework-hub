@@ -6,19 +6,18 @@ are referred to as "collections".
 
 """
 
-import sqlite3
-import os
-from robot.libdocpkg import LibraryDocumentation
-import robot.libraries
-import logging
 import json
+import logging
+import os
 import re
-import sys
+import sqlite3
 from operator import itemgetter
 
+import robot.libraries
+from robot.libdocpkg import LibraryDocumentation
+from watchdog.events import PatternMatchingEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.polling import PollingObserver
-from watchdog.events import PatternMatchingEventHandler
 
 """
 Note: It seems to be possible for watchdog to fire an event
@@ -33,10 +32,10 @@ elapsed? I haven't yet experienced this problem, but
 I haven't done extensive testing.
 """
 
+
 class WatchdogHandler(PatternMatchingEventHandler):
-    patterns = ["*.robot", "*.txt", "*.py", "*.tsv", "*.resource"]
     def __init__(self, kwdb, path):
-        PatternMatchingEventHandler.__init__(self)
+        super().__init__(patterns=["*.robot", "*.txt", "*.py", "*.tsv", "*.resource"])
         self.kwdb = kwdb
         self.path = path
 
@@ -52,6 +51,7 @@ class WatchdogHandler(PatternMatchingEventHandler):
     def on_modified(self, event):
         self.kwdb.on_change(event.src_path, event.event_type)
 
+
 class KeywordTable(object):
     """A SQLite database of keywords"""
 
@@ -59,26 +59,27 @@ class KeywordTable(object):
         self.db = sqlite3.connect(dbfile, check_same_thread=False)
         self.log = logging.getLogger(__name__)
         self._create_db()
-#        self.log.warning("I'm warnin' ya!")
+        #        self.log.warning("I'm warnin' ya!")
 
         # set up watchdog observer to monitor changes to
         # keyword files (or more correctly, to directories
         # of keyword files)
-        self.observer =  PollingObserver() if poll else Observer()
+        self.observer = PollingObserver() if poll else Observer()
         self.observer.start()
 
     def add(self, name, monitor=True):
-        """Add a folder, library (.py) or resource file (.robot, .tsv, .txt, .resource) to the database
-        """
+        """Add a folder, library (.py) or resource file (.robot, .tsv, .txt, .resource) to the database"""
 
         if os.path.isdir(name):
-            if (not os.path.basename(name).startswith(".")):
+            if not os.path.basename(name).startswith("."):
                 self.add_folder(name)
 
         elif os.path.isfile(name):
-            if ((self._looks_like_resource_file(name)) or
-                (self._looks_like_libdoc_file(name)) or
-                (self._looks_like_library_file(name))):
+            if (
+                (self._looks_like_resource_file(name))
+                or (self._looks_like_libdoc_file(name))
+                or (self._looks_like_library_file(name))
+            ):
                 self.add_file(name)
         else:
             # let's hope it's a library name!
@@ -94,8 +95,8 @@ class KeywordTable(object):
         # I can do all this work in a sql statement, but
         # for debugging it's easier to do it in stages.
         sql = """SELECT collection_id
-                 FROM collection_table
-                 WHERE path == ?
+                FROM collection_table
+                WHERE path == ?
         """
         cursor = self._execute(sql, (path,))
         results = cursor.fetchall()
@@ -106,7 +107,7 @@ class KeywordTable(object):
             collection_id = result[0]
             # remove all keywords in this collection
             sql = """DELETE from keyword_table
-                     WHERE collection_id == ?
+                    WHERE collection_id == ?
             """
             cursor = self._execute(sql, (collection_id,))
             self._load_keywords(collection_id, path=path)
@@ -114,31 +115,39 @@ class KeywordTable(object):
     def _load_keywords(self, collection_id, path=None, libdoc=None):
         """Load a collection of keywords
 
-           One of path or libdoc needs to be passed in...
+        One of path or libdoc needs to be passed in...
         """
         if libdoc is None and path is None:
-            raise(Exception("You must provide either a path or libdoc argument"))
+            raise (Exception("You must provide either a path or libdoc argument"))
 
         if libdoc is None:
             libdoc = LibraryDocumentation(path)
 
         if len(libdoc.keywords) > 0:
             for keyword in libdoc.keywords:
-                self._add_keyword(collection_id, keyword.name, keyword.doc, keyword.args)
+                self._add_keyword(
+                    collection_id, keyword.name, keyword.doc, keyword.args
+                )
 
     def add_file(self, path):
         """Add a resource file or library file to the database"""
         libdoc = LibraryDocumentation(path)
         if len(libdoc.keywords) > 0:
-            if libdoc.doc.startswith("Documentation for resource file"):
-                # bah! The file doesn't have an file-level documentation
+            doc = libdoc.doc
+            if doc.startswith("Documentation for resource file"):
+                # bah! The file doesn't have a file-level documentation
                 # and libdoc substitutes some placeholder text.
-                libdoc.doc = ""
+                doc = "[No doucmentation provided in file]"
 
-            collection_id = self.add_collection(path, libdoc.name, libdoc.type,
-                                                libdoc.doc, libdoc.version,
-                                                libdoc.scope, libdoc.named_args,
-                                                libdoc.doc_format)
+            collection_id = self.add_collection(
+                path,
+                libdoc.name,
+                libdoc.type,
+                doc,
+                libdoc.version,
+                libdoc.scope,
+                c_doc_format=libdoc.doc_format,
+            )
             self._load_keywords(collection_id, libdoc=libdoc)
 
     def add_library(self, name):
@@ -150,10 +159,15 @@ class KeywordTable(object):
         libdoc = LibraryDocumentation(name)
         if len(libdoc.keywords) > 0:
             # FIXME: figure out the path to the library file
-            collection_id = self.add_collection(None, libdoc.name, libdoc.type,
-                                                libdoc.doc, libdoc.version,
-                                                libdoc.scope, libdoc.named_args,
-                                                libdoc.doc_format)
+            collection_id = self.add_collection(
+                None,
+                libdoc.name,
+                libdoc.type,
+                libdoc.doc,
+                libdoc.version,
+                libdoc.scope,
+                c_doc_format=libdoc.doc_format,
+            )
             self._load_keywords(collection_id, libdoc=libdoc)
 
     def add_folder(self, dirname, watch=True):
@@ -174,10 +188,11 @@ class KeywordTable(object):
                 exclude_patterns = []
                 for line in f.readlines():
                     line = line.strip()
-                    if (re.match(r'^\s*#', line)): continue
+                    if re.match(r"^\s*#", line):
+                        continue
                     if len(line.strip()) > 0:
                         exclude_patterns.append(line)
-        except:
+        except Exception:
             # should probably warn the user?
             pass
 
@@ -186,17 +201,17 @@ class KeywordTable(object):
             (basename, ext) = os.path.splitext(filename.lower())
 
             try:
-                if (os.path.isdir(path)):
-                    if (not basename.startswith(".")):
+                if os.path.isdir(path):
+                    if not basename.startswith("."):
                         if os.access(path, os.R_OK):
                             self.add_folder(path, watch=False)
                 else:
-                    if (ext in (".xml", ".robot", ".txt", ".py", ".tsv", ".resource")):
+                    if ext in (".xml", ".robot", ".txt", ".py", ".tsv", ".resource"):
                         if os.access(path, os.R_OK):
                             self.add(path)
             except Exception as e:
                 # I really need to get the logging situation figured out.
-                print("bummer:", str(e))
+                print(f"bummer: {e}")
 
         # FIXME:
         # instead of passing a flag around, I should just keep track
@@ -210,8 +225,17 @@ class KeywordTable(object):
             event_handler = WatchdogHandler(self, dirname)
             self.observer.schedule(event_handler, dirname, recursive=True)
 
-    def add_collection(self, path, c_name, c_type, c_doc, c_version="unknown",
-                       c_scope="", c_namedargs="yes", c_doc_format="ROBOT"):
+    def add_collection(
+        self,
+        path,
+        c_name,
+        c_type,
+        c_doc,
+        c_version="unknown",
+        c_scope="",
+        c_namedargs="yes",
+        c_doc_format="ROBOT",
+    ):
         """Insert data into the collection table"""
         if path is not None:
             # We want to store the normalized form of the path in the
@@ -219,18 +243,30 @@ class KeywordTable(object):
             path = os.path.abspath(path)
 
         cursor = self.db.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO collection_table
                 (name, type, version, scope, namedargs, path, doc, doc_format)
             VALUES
                 (?,?,?,?,?,?,?,?)
-        """, (c_name, c_type, c_version, c_scope, c_namedargs, path, c_doc, c_doc_format))
+        """,
+            (
+                c_name,
+                c_type,
+                c_version,
+                c_scope,
+                c_namedargs,
+                path,
+                c_doc,
+                c_doc_format,
+            ),
+        )
         collection_id = cursor.lastrowid
         return collection_id
 
-    def add_installed_libraries(self, extra_libs = ["SeleniumLibrary",
-                                                    "SudsLibrary",
-                                                    "RequestsLibrary"]):
+    def add_installed_libraries(
+        self, extra_libs=["SeleniumLibrary", "SudsLibrary", "RequestsLibrary"]
+    ):
         """Add any installed libraries that we can find
 
         We do this by looking in the `libraries` folder where
@@ -243,28 +279,26 @@ class KeywordTable(object):
         for filename in os.listdir(libdir):
             if filename.endswith(".py") or filename.endswith(".pyc"):
                 libname, ext = os.path.splitext(filename)
-                if (libname.lower() not in loaded and
-                    not self._should_ignore(libname)):
-
+                if libname.lower() not in loaded and not self._should_ignore(libname):
                     try:
                         self.add(libname)
                         loaded.append(libname.lower())
                     except Exception as e:
                         # need a better way to log this...
-                        self.log.debug("unable to add library: " + str(e))
+                        self.log.debug(f"unable to add library: {e}")
 
         # I hate how I implemented this, but I don't think there's
         # any way to find out which installed python packages are
         # robot libraries.
         for library in extra_libs:
-            if (library.lower() not in loaded and
-                not self._should_ignore(library)):
+            if library.lower() not in loaded and not self._should_ignore(library):
                 try:
                     self.add(library)
                     loaded.append(library.lower())
                 except Exception as e:
-                    self.log.debug("unable to add external library %s: %s" % \
-                                   (library, str(e)))
+                    self.log.debug(
+                        f"unable to add external library {library}: {str(e)}"
+                    )
 
     def get_collection(self, collection_id):
         """Get a specific collection"""
@@ -274,8 +308,8 @@ class KeywordTable(object):
                         collection.version, collection.scope,
                         collection.namedargs,
                         collection.doc_format
-                 FROM collection_table as collection
-                 WHERE collection_id == ? OR collection.name like ?
+                FROM collection_table as collection
+                WHERE collection_id == ? OR collection.name like ?
         """
         cursor = self._execute(sql, (collection_id, collection_id))
         # need to handle the case where we get more than one result...
@@ -285,11 +319,11 @@ class KeywordTable(object):
             "type": sql_result[1],
             "name": sql_result[2],
             "path": sql_result[3],
-            "doc":  sql_result[4],
+            "doc": sql_result[4],
             "version": sql_result[5],
-            "scope":   sql_result[6],
+            "scope": sql_result[6],
             "namedargs": sql_result[7],
-            "doc_format": sql_result[8]
+            "doc_format": sql_result[8],
         }
         return sql_result
 
@@ -298,49 +332,55 @@ class KeywordTable(object):
 
         sql = """SELECT collection.collection_id, collection.name, collection.doc,
                         collection.type, collection.path
-                 FROM collection_table as collection
-                 WHERE name like ?
-                 AND type like ?
-                 ORDER BY collection.name
-              """
+                FROM collection_table as collection
+                WHERE name like ?
+                AND type like ?
+                ORDER BY collection.name
+            """
 
-        cursor = self._execute(sql, (self._glob_to_sql(pattern),
-                                     self._glob_to_sql(libtype)))
+        cursor = self._execute(
+            sql, (self._glob_to_sql(pattern), self._glob_to_sql(libtype))
+        )
         sql_result = cursor.fetchall()
 
-        return [{"collection_id": result[0],
-                 "name": result[1],
-                 "synopsis": result[2].split("\n")[0],
-                 "type": result[3],
-                 "path": result[4]
-             } for result in sql_result]
+        return [
+            {
+                "collection_id": result[0],
+                "name": result[1],
+                "synopsis": result[2].split("\n")[0],
+                "type": result[3],
+                "path": result[4],
+            }
+            for result in sql_result
+        ]
 
     def get_keyword_data(self, collection_id):
         sql = """SELECT keyword.keyword_id, keyword.name, keyword.args, keyword.doc
-                 FROM keyword_table as keyword
-                 WHERE keyword.collection_id == ?
-                 ORDER BY keyword.name
-              """
+                FROM keyword_table as keyword
+                WHERE keyword.collection_id == ?
+                ORDER BY keyword.name
+            """
         cursor = self._execute(sql, (collection_id,))
         return cursor.fetchall()
 
     def get_keyword(self, collection_id, name):
         """Get a specific keyword from a library"""
         sql = """SELECT keyword.name, keyword.args, keyword.doc
-                 FROM keyword_table as keyword
-                 WHERE keyword.collection_id == ?
-                 AND keyword.name like ?
-              """
-        cursor = self._execute(sql, (collection_id,name))
+                FROM keyword_table as keyword
+                WHERE keyword.collection_id == ?
+                AND keyword.name like ?
+            """
+        cursor = self._execute(sql, (collection_id, name))
         # We're going to assume no library has duplicate keywords
         # While that in theory _could_ happen, it never _should_,
         # and you get what you deserve if it does.
         row = cursor.fetchone()
         if row is not None:
-            return {"name": row[0],
-                    "args": json.loads(row[1]),
-                    "doc": row[2],
-                    "collection_id": collection_id
+            return {
+                "name": row[0],
+                "args": json.loads(row[1]),
+                "doc": row[2],
+                "collection_id": collection_id,
             }
         return {}
 
@@ -357,13 +397,13 @@ class KeywordTable(object):
         """
 
         sql = """SELECT collection.collection_id, collection.name, collection.path,
-                 keyword.name, keyword.doc
-                 FROM collection_table as collection
-                 JOIN keyword_table as keyword
-                 WHERE collection.collection_id == keyword.collection_id
-                 AND keyword.name like ?
-                 ORDER by collection.name, collection.collection_id, keyword.name
-             """
+                keyword.name, keyword.doc
+                FROM collection_table as collection
+                JOIN keyword_table as keyword
+                WHERE collection.collection_id == keyword.collection_id
+                AND keyword.name like ?
+                ORDER by collection.name, collection.collection_id, keyword.name
+            """
         cursor = self._execute(sql, (self._glob_to_sql(pattern),))
         libraries = []
         current_library = None
@@ -371,7 +411,14 @@ class KeywordTable(object):
             (c_id, c_name, c_path, k_name, k_doc) = row
             if c_id != current_library:
                 current_library = c_id
-                libraries.append({"name": c_name, "collection_id": c_id, "keywords": [], "path": c_path})
+                libraries.append(
+                    {
+                        "name": c_name,
+                        "collection_id": c_id,
+                        "keywords": [],
+                        "path": c_path,
+                    }
+                )
             libraries[-1]["keywords"].append({"name": k_name, "doc": k_doc})
         return libraries
 
@@ -399,19 +446,25 @@ class KeywordTable(object):
         args = [pattern, pattern]
         if mode == "name":
             COND = "(keyword.name like ?)"
-            args = [pattern,]
+            args = [
+                pattern,
+            ]
 
-        sql = """SELECT collection.collection_id, collection.name, keyword.name, keyword.doc
-                 FROM collection_table as collection
-                 JOIN keyword_table as keyword
-                 WHERE collection.collection_id == keyword.collection_id
-                 AND %s
-                 ORDER by collection.collection_id, collection.name, keyword.name
-             """ % COND
+        sql = (
+            f"""SELECT collection.collection_id, collection.name, keyword.name, keyword.doc
+                FROM collection_table as collection
+                JOIN keyword_table as keyword
+                WHERE collection.collection_id == keyword.collection_id
+                AND {COND}
+                ORDER by collection.collection_id, collection.name, keyword.name
+            """
+        )
 
         cursor = self._execute(sql, args)
-        result = [(row[0], row[1], row[2], row[3].strip().split("\n")[0])
-                  for row in cursor.fetchall()]
+        result = [
+            (row[0], row[1], row[2], row[3].strip().split("\n")[0])
+            for row in cursor.fetchall()
+        ]
         return list(set(result))
 
     def get_keywords(self, pattern="*"):
@@ -425,16 +478,15 @@ class KeywordTable(object):
 
         sql = """SELECT collection.collection_id, collection.name,
                         keyword.name, keyword.doc, keyword.args
-                 FROM collection_table as collection
-                 JOIN keyword_table as keyword
-                 WHERE collection.collection_id == keyword.collection_id
-                 AND keyword.name like ?
-                 ORDER by collection.name, keyword.name
-             """
+                FROM collection_table as collection
+                JOIN keyword_table as keyword
+                WHERE collection.collection_id == keyword.collection_id
+                AND keyword.name like ?
+                ORDER by collection.name, keyword.name
+            """
         pattern = self._glob_to_sql(pattern)
         cursor = self._execute(sql, (pattern,))
-        result = [(row[0], row[1], row[2], row[3], row[4])
-                  for row in cursor.fetchall()]
+        result = [(row[0], row[1], row[2], row[3], row[4]) for row in cursor.fetchall()]
         return list(sorted(set(result), key=itemgetter(2)))
 
     def reset(self):
@@ -468,26 +520,31 @@ class KeywordTable(object):
         # us from doing a full parse of files that are obviously
         # not robot files
 
-        if (re.search(r'__init__.(txt|robot|html|tsv)$', name)):
+        if re.search(r"__init__.(txt|robot|html|tsv)$", name):
             # These are initialize files, not resource files
             return False
 
         found_keyword_table = False
-        if (name.lower().endswith(".robot") or
-            name.lower().endswith(".txt") or
-            name.lower().endswith(".tsv") or
-            name.lower().endswith(".resource")):
-
+        if (
+            name.lower().endswith(".robot")
+            or name.lower().endswith(".txt")
+            or name.lower().endswith(".tsv")
+            or name.lower().endswith(".resource")
+        ):
             with open(name, "r") as f:
                 data = f.read()
-                for match in re.finditer(r'^\*+\s*(Test Cases?|(?:User )?Keywords?)',
-                                         data, re.MULTILINE|re.IGNORECASE):
-                    if (re.match(r'Test Cases?', match.group(1), re.IGNORECASE)):
+                for match in re.finditer(
+                    r"^\*+\s*(Test Cases?|(?:User )?Keywords?)",
+                    data,
+                    re.MULTILINE | re.IGNORECASE,
+                ):
+                    if re.match(r"Test Cases?", match.group(1), re.IGNORECASE):
                         # if there's a test case table, it's not a keyword file
                         return False
 
-                    if (not found_keyword_table and
-                        re.match(r'(User )?Keywords?', match.group(1), re.IGNORECASE)):
+                    if not found_keyword_table and re.match(
+                        r"(User )?Keywords?", match.group(1), re.IGNORECASE
+                    ):
                         found_keyword_table = True
         return found_keyword_table
 
@@ -499,10 +556,12 @@ class KeywordTable(object):
         for "give me a list of installed libraries"...
         """
         _name = name.lower()
-        return (_name.startswith("deprecated") or
-                _name.startswith("_") or
-                _name in ("remote", "reserved",
-                          "dialogs_py", "dialogs_ipy", "dialogs_jy"))
+        return (
+            _name.startswith("deprecated")
+            or _name.startswith("_")
+            or _name
+            in ("remote", "reserved", "dialogs_py", "dialogs_ipy", "dialogs_jy")
+        )
 
     def _execute(self, *args):
         """Execute an SQL query
@@ -521,28 +580,47 @@ class KeywordTable(object):
         sqlite database we'll make it json we can can convert it back
         to a list later.
         """
-        argstring = json.dumps(args)
-        self.db.execute("""
+        # In modern Robot Framework, 'args' is an ArgumentSpec object.
+        # We build the list of argument strings directly from its properties
+        # to avoid parsing errors.
+        arg_list = []
+        for arg_name in args.positional:
+            if arg_name in args.defaults:
+                default_value = args.defaults[arg_name]
+                arg_list.append(f"{arg_name}={default_value}")
+            else:
+                arg_list.append(arg_name)
+
+        if args.var_positional:
+            arg_list.append(f"*{args.var_positional}")
+
+        if args.var_named:
+            arg_list.append(f"**{args.var_named}")
+
+        argstring = json.dumps(arg_list)
+        self.db.execute(
+            """
             INSERT INTO keyword_table
                 (collection_id, name, doc, args)
             VALUES
                 (?,?,?,?)
-        """, (collection_id, name, doc, argstring))
+        """,
+            (collection_id, name, doc, argstring),
+        )
 
     def _create_db(self):
-
         if not self._table_exists("collection_table"):
             self.db.execute("""
                 CREATE TABLE collection_table
                 (collection_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 name          TEXT COLLATE NOCASE,
-                 type          COLLATE NOCASE,
-                 version       TEXT,
-                 scope         TEXT,
-                 namedargs     TEXT,
-                 path          TEXT,
-                 doc           TEXT,
-                 doc_format    TEXT)
+                name          TEXT COLLATE NOCASE,
+                type          COLLATE NOCASE,
+                version       TEXT,
+                scope         TEXT,
+                namedargs     TEXT,
+                path          TEXT,
+                doc           TEXT,
+                doc_format    TEXT)
             """)
             self.db.execute("""
                 CREATE INDEX collection_index
@@ -553,19 +631,18 @@ class KeywordTable(object):
             self.db.execute("""
                 CREATE TABLE keyword_table
                 (keyword_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-                 name          TEXT COLLATE NOCASE,
-                 collection_id INTEGER,
-                 doc           TEXT,
-                 args          TEXT)
+                name          TEXT COLLATE NOCASE,
+                collection_id INTEGER,
+                doc           TEXT,
+                args          TEXT)
             """)
             self.db.execute("""
                 CREATE INDEX keyword_index
                 ON keyword_table (name)
             """)
 
-
     def _glob_to_sql(self, string):
-        """Convert glob-like wildcards to SQL wildcards
+        r"""Convert glob-like wildcards to SQL wildcards
 
         * becomes %
         ? becomes _
@@ -583,12 +660,20 @@ class KeywordTable(object):
         # depends on the substitutiones being done in order.  chr(1)
         # and chr(2) were picked because I know those characters
         # almost certainly won't be in the input string
-        table = ((r'\\', chr(1)), (r'\*', chr(2)), (r'\?', chr(3)),
-                 (r'%', r'\%'),   (r'?', '_'),     (r'*', '%'),
-                 (chr(1), r'\\'), (chr(2), r'\*'), (chr(3), r'\?'))
+        table = (
+            (r"\\", chr(1)),
+            (r"\*", chr(2)),
+            (r"\?", chr(3)),
+            (r"%", r"\%"),
+            (r"?", "_"),
+            (r"*", "%"),
+            (chr(1), r"\\"),
+            (chr(2), r"\*"),
+            (chr(3), r"\?"),
+        )
 
-        for (a, b) in table:
-            string = string.replace(a,b)
+        for a, b in table:
+            string = string.replace(a, b)
 
         string = string[1:] if string.startswith("^") else "%" + string
         string = string[:-1] if string.endswith("$") else string + "%"
@@ -596,8 +681,81 @@ class KeywordTable(object):
         return string
 
     def _table_exists(self, name):
-        cursor = self.db.execute("""
+        cursor = self.db.execute(
+            f"""
             SELECT name FROM sqlite_master
-            WHERE type='table' AND name='%s'
-        """ % name)
+            WHERE type='table' AND name='{name}'
+        """
+        )
         return len(cursor.fetchall()) > 0
+
+    def get_collections_tree(self):
+        """
+        Returns a hierarchical dictionary of all collections,
+        mimicking the file system structure.
+        """
+        collections = self.get_collections()
+        tree = {'name': 'Collections', 'type': 'folder', 'children': []}
+
+        # Separate standard libs (no path) from local files
+        standard_libs = [c for c in collections if not c.get('path')]
+        path_collections = [c for c in collections if c.get('path')]
+
+        # Add standard libraries directly to a 'Standard Libraries' folder in the tree
+        if standard_libs:
+            lib_folder = {'name': 'Standard Libraries', 'type': 'folder', 'children': []}
+            for collection in sorted(standard_libs, key=lambda x: x['name']):
+                lib_folder['children'].append({
+                    'name': collection['name'],
+                    'type': 'library',
+                    'collection_id': collection['collection_id']
+                })
+            tree['children'].append(lib_folder)
+
+        if not path_collections:
+            return tree
+
+        # Determine the common base path for local files to create a clean root
+        try:
+            common_prefix = os.path.commonpath([c['path'] for c in path_collections])
+            # If the common prefix is just the drive, don't use it
+            if common_prefix.endswith(':'):
+                common_prefix += '\\'
+            if len(common_prefix) <= 3: # Handles C:\
+                common_prefix = os.path.dirname(common_prefix)
+
+        except ValueError:
+            common_prefix = ''
+
+        # Create a dictionary to act as a cache for folder nodes
+        node_cache = {'children': tree['children']}
+
+        for collection in sorted(path_collections, key=lambda x: x['path']):
+            relative_path = os.path.relpath(collection['path'], common_prefix)
+            path_parts = relative_path.split(os.sep)
+
+            current_level = tree['children']
+
+            # Navigate or create folder nodes for the path
+            for i, part in enumerate(path_parts[:-1]):
+                # Create a unique key for the current path segment
+                current_path_key = os.path.join(*path_parts[:i+1])
+
+                if current_path_key not in node_cache:
+                    folder_node = {'name': part, 'type': 'folder', 'children': []}
+                    current_level.append(folder_node)
+                    current_level.sort(key=lambda x: (x['type'] != 'folder', x['name']))
+                    node_cache[current_path_key] = folder_node
+
+                current_level = node_cache[current_path_key]['children']
+
+            # Add the final file/resource node
+            leaf_name = path_parts[-1]
+            current_level.append({
+                'name': leaf_name,
+                'type': 'file',
+                'collection_id': collection['collection_id']
+            })
+            current_level.sort(key=lambda x: (x['type'] != 'folder', x['name']))
+
+        return tree
