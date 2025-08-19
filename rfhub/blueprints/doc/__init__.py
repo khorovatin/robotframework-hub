@@ -5,8 +5,7 @@ import json
 
 import flask
 from flask import current_app
-from robot.libdocpkg import LibraryDocumentation
-from robot.libdocpkg.htmlwriter import LibdocHtmlWriter
+from robot.libdocpkg.htmlutils import DocToHtml
 
 from rfhub.version import __version__
 
@@ -119,18 +118,19 @@ def doc_for_library(collection_id, keyword=None) -> str:
     """Render library documentation"""
     kwdb = current_app.config["kwdb"]
 
+    libdoc = kwdb.get_collection(collection_id)
+    lib_doc_format = libdoc.get("doc_format", "ROBOT")
+
     keywords = []
     for (keyword_id, name, args, doc) in kwdb.get_keyword_data(collection_id):
         # args is a json list; convert it to actual list, and
         # then convert that to a string
         args = ", ".join(json.loads(args))
-        doc = doc_to_html(doc)
+        doc_html = doc_to_html(doc, lib_doc_format)
         target = name == keyword
-        keywords.append((name, args, doc, target))
+        keywords.append((name, args, doc_html, target))
 
-    # this is the introduction documentation for the library
-    libdoc = kwdb.get_collection(collection_id)
-    libdoc["doc"] = doc_to_html(libdoc["doc"], libdoc["doc_format"])
+    libdoc["doc"] = doc_to_html(libdoc["doc"], lib_doc_format)
 
     # this data is necessary for the nav panel
     hierarchy = get_navpanel_data(kwdb)
@@ -172,8 +172,31 @@ def get_navpanel_data(kwdb):
     return data
 
 
-def doc_to_html(doc, doc_format="ROBOT") -> str:
-    """Convert documentation to HTML"""
-    output = io.StringIO()
-    LibdocHtmlWriter(doc_format).write(doc, output)
-    return output.getvalue()
+
+def doc_to_html(doc: str | None, doc_format: str = "ROBOT") -> str:
+    """Convert a single Robot Framework documentation string to HTML.
+
+    WHY:
+        `LibdocHtmlWriter` writes a full interactive Libdoc HTML page and
+        requires a *libdoc model* with a `.to_json()` method. Here we only have a
+        plain docstring (``doc``), so we must use `DocToHtml`, which converts
+        a single docstring from its source format (robot/html/text/rest) to HTML.
+
+    Notes:
+        - RF ≥ 4.0 moved `DocToHtml` to `robot.libdocpkg.htmlutils`.
+        - Valid formats are ``ROBOT``, ``HTML``, ``TEXT``, ``REST`` (case-insensitive).
+            An invalid value raises a `DataError` from Robot Framework.
+
+    Returns:
+        HTML string suitable for direct embedding in Jinja (mark as safe).
+    """
+    if not doc:
+        return ""
+
+    # Normalize the format to what RF expects (uppercase tokens).
+    fmt = (doc_format or "ROBOT").upper()
+    # DocToHtml is callable and returns the converted HTML.
+    html = DocToHtml(fmt)(doc)  # see RF source for signature/behavior
+    # If you want to prevent Jinja from escaping later, return Markup(html).
+    # If template uses `|safe`, returning plain str is fine.
+    return html
