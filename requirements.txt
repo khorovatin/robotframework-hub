@@ -1,15 +1,15 @@
-Flask==1.1.1
-Jinja2==2.10.3
-MarkupSafe==0.23
-PyYAML==5.1
-Werkzeug==0.15.3
-argh==0.25.0
-itsdangerous==0.24
-tornado>=6.0.3
-pathtools3==0.2.1
-requests==2.20.0
-robotframework>=2.8.5
-robotframework-requests==0.5.0
-robotframework-seleniumlibrary>=4.0.0
-watchdog==0.9.0
-# wsgiref==0.1.2
+Flask>=2.2,<3.0
+Jinja2>=3.0.0
+MarkupSafe>=2.0.0
+PyYAML>=6.0.0
+Werkzeug>=2.0.0
+argh>=0.26.0
+itsdangerous>=2.0.0
+tornado>=6.1,<7.0
+pathtools3>=0.2.1
+requests>=2.25.0
+robotframework>=6.0,<8    # verified on 7.3.x
+robotframework-requests>=0.9.0
+robotframework-seleniumlibrary>=6.0.0
+watchdog>=2.0.0
+# wsgiref>=0.1.2
