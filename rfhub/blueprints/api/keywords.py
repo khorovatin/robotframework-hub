@@ -33,7 +33,7 @@ class ApiEndpoint:
         """
         query_pattern = request.args.get('pattern', "*").strip().lower()
         # Why: Fetches raw keyword data from the keyword database (kwdb).
-        kwdb = getattr(current_app, "kwdb", None)
+        kwdb = current_app.config.get("kwdb", None)
         if kwdb is None:
             current_app.logger.error("The 'kwdb' attribute is not set on the Flask app instance.")
             abort(500, description="Internal server error: keyword database not configured.")
@@ -106,7 +106,7 @@ class ApiEndpoint:
         :param keyword: The name of the keyword to retrieve.
         :return: A Flask JSON response with the keyword's details or a 404 error.
         """
-        kwdb = getattr(current_app, "kwdb", None)
+        kwdb = current_app.config.get("kwdb", None)
         if kwdb is None:
             current_app.logger.error("The 'kwdb' attribute is not set on the Flask app instance.")
             abort(500, description="Internal server error: keyword database not configured.")

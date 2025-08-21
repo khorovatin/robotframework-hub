@@ -77,12 +77,13 @@ Verify that a query returns the library name for each keyword
     
     # the list of keywords will be made up of (id, library, keyword, doc, args)
     # tuples; make sure the library is correct for all items
-    :FOR    ${kw}    IN    @{keywords}
-       Length should be    ${kw}    5
-       ...    expected the result to contain 4 elements but it did not. 
-       Should be equal    ${kw[1]}    twokeywords
-       ...    Expected the keyword library name to be "twokeywords" but it was "${kw[0]}"
-       ...    values=False
+    FOR    ${kw}    IN    @{keywords}
+        Length should be    ${kw}    5
+        ...    expected the result to contain 4 elements but it did not. 
+        Should be equal    ${kw[1]}    twokeywords
+        ...    Expected the keyword library name to be "twokeywords" but it was "${kw[0]}"
+        ...    values=False
+    END
 
 Verify that a query returns the expected keyword names
     [Documentation]
@@ -122,16 +123,18 @@ Verify that a query returns a keyword with the expected data
     Load a resource file into KWDB    ${DATA_DIR}/twokeywords.robot
     # we assume that since we only load one file, it has an id of 1...
     ${keyword}=    Call method    ${KWDB}    get_keyword    1    Keyword #1
-    Dictionary should contain item    ${keyword}    name              Keyword #1
-    Dictionary should contain item    ${keyword}    collection_id     1
-    Dictionary should contain item    ${keyword}    doc               Documentation for Keyword #1
-    Dictionary should contain item    ${keyword}    args              []
+    Dictionary should contain item      ${keyword}    name              Keyword #1
+    Dictionary should contain item      ${keyword}    collection_id     1
+    Dictionary should contain item      ${keyword}    doc               Documentation for Keyword #1
+    ${args} =    Get From Dictionary    ${keyword}    args
+    Should Be Empty    ${args}
     # Do it again, for another keyword
     ${keyword}=    Call method    ${KWDB}    get_keyword    1    Keyword #2
-    Dictionary should contain item    ${keyword}    name              Keyword #2
-    Dictionary should contain item    ${keyword}    collection_id     1
-    Dictionary should contain item    ${keyword}    doc               Documentation for Keyword #2
-    Dictionary should contain item    ${keyword}    args              []
+    Dictionary should contain item      ${keyword}    name              Keyword #2
+    Dictionary should contain item      ${keyword}    collection_id     1
+    Dictionary should contain item      ${keyword}    doc               Documentation for Keyword #2
+    ${args} =    Get From Dictionary    ${keyword}    args
+    Should Be Empty    ${args}
 
 *** Keywords ***
 

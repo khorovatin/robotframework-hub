@@ -19,8 +19,9 @@ Query with no ?fields parameter returns all expected fields
     ...    Do a GET on    /api/keywords?pattern=none+shall+pass
     ...    AND    Get first returned keyword
     
-    :FOR    ${key}    IN    @{all data keys}
-       dictionary should contain key    ${KEYWORD}    ${key}
+    FOR    ${key}    IN    @{all data keys}
+        dictionary should contain key    ${KEYWORD}    ${key}
+    END
 
 Query with explicit fields (?fields=name,synopsis)
     [Setup]    Run keywords

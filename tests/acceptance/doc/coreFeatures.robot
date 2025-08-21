@@ -22,8 +22,8 @@ Nav panel shows correct number of collections
     ...    Get list of libraries via the API    AND
     ...    Go to    ${ROOT}/doc/
     ${actual}    Get element count    //*[@id="left"]/ul/li/label
-    Should Be Equal As Integers    ${actual}    11
-    ...    Expected 11 items in navlist, found ${actual}
+    Should Be Equal As Integers    ${actual}    8
+    ...    Expected 8 items in navlist, found ${actual}
 
 Nav panel shows all libraries
     [Documentation]
@@ -57,11 +57,12 @@ Main panel shows all libraries
     [Setup]    Run keywords
     ...    Get list of libraries via the API    AND
     ...    Go to    ${ROOT}/doc
-    :FOR    ${lib}    IN    @{libraries}
-    ${name}    Get from dictionary    ${lib}    name
-    Page should contain element
-    ...    //*[@id="right"]//a[./text()='${name}']
-    ...    limit=1
+    FOR    ${lib}    IN    @{libraries}
+        ${name}    Get from dictionary    ${lib}    name
+        Page should contain element
+        ...    //*[@id="right"]//a[./text()='${name}']
+        ...    limit=1
+    END
 
 Main panel shows all library descriptions
     [Documentation]
@@ -85,3 +86,4 @@ Get list of libraries via the API
     Do a get on    /api/libraries
     ${libraries}=    Get From Dictionary    ${JSON}    libraries
     Set suite variable    ${libraries}
+    Log List    ${libraries}

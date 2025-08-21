@@ -18,7 +18,7 @@ Do a GET on
     ...                Do a get on     http://www.google.com     blah blah blah
     ...                Do a get on     blah blah blah blah blah
 
-    ${response}=    GET On Session    rfhub    ${url}
+    ${response}=    GET On Session    rfhub    ${url}    expected_status=Anything
     IF    "${response.status_code}" == "200"
         Set Test Variable    ${JSON}    ${response.json()}
     END

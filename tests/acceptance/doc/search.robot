@@ -116,7 +116,7 @@ Using the in: prefix
     [Documentation]
     ...    Objective: verify the in: prefix works
     Go to    ${ROOT}/doc
-    Search for    screenshot in:Selenium2Library
+    Search for    screenshot in:SeleniumLibrary
     Page should contain    Searching for 'screenshot' found 4 keywords
     ...    Expected results to include exactly 4 keywords, but it didn't
 
@@ -133,7 +133,7 @@ Clicking search result link shows keyword
     # Perhaps that's a bad thing to assume, but since this test suite
     # controls which libraries are loaded, it's a reasonably safe bet.
     Wait Until Element Is Visible    id=kw-none-shall-pass
-    Location should be    ${ROOT}/doc/keywords/6/None%20Shall%20Pass/
+    Location should be    ${ROOT}/doc/keywords/6/None%20Shall%20Pass
 
 *** Keywords ***
 Search for
